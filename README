@@ -1,0 +1,19 @@
+PLANBOX API SANDBOX
+-------------------
+A single-page-application you can load in your Browser to access the Planbox API.
+Calls the Planbox REST API using JSONP to avoid cross domain issues.
+
+REQUIREMENTS
+- A Planbox account. You can get one for Free here: https://www.planbox.com/signup/pricing
+- A Web Browser like Firefox or Chrome.
+
+WHAT CAN I DO WITH THIS?
+- Learn how to use the Planbox API
+- Develop your own SCRUM User Interface (using the Planbox engine and database)
+- Create custom reports
+- Create yourself dashboard
+- Create a Kanban board
+
+Author: Martin Drapeau
+Copyright: Planbox Inc. 2011-2012
+License: MIT License (http://en.wikipedia.org/wiki/MIT_License)

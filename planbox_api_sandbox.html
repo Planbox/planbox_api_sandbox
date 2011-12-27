@@ -1,0 +1,492 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta content="text/html; charset=utf-8;" http-equiv="Content-Type">
+	<title>Planbox API Sandbox</title>
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7/jquery.min.js" type="text/javascript"></script>
+</head>
+
+<style>
+	* {
+		margin: 0;
+		padding: 0;}
+	
+	html {
+		overflow-y:scroll;
+		font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+		min-height:100%;}
+	
+	body {
+		line-height: 1;}
+	
+	ul {
+		list-style: none;}
+		
+	input, textarea {
+		font-family: 'Verdana', Tahoma, Arial, 'Sans serif';}
+	
+	.fr {float:right;}
+	.fl {float:left;}
+	.clear {clear:both;}
+	.error {color:#990000;}
+	.ok {color:#009900;}
+	
+	#header {
+		background-color:#F0F0F0;}
+	
+	#header a.logo {
+		display:block;}
+	
+	#header div.sandbox {
+		font-size:30px;
+		font-weight:bold;
+		color:#999;
+		padding:10px 0 0 20px;}
+	
+	#header a.help {
+		margin:20px;}
+	
+	#header div.login_logout {
+		padding:15px;}
+		
+	#message {
+		min-height:20px;
+		text-align:center;
+		padding:5px 0;}
+		
+	#buttons {
+		padding:15px;}
+		
+	#buttons button,
+	#buttons label {
+		margin-right:5px;}
+		
+	#content {
+		border-top:1px solid #DDD;
+		min-height:400px;}
+		
+	#content table {
+		width:100%;
+		font-size:12px;
+		font-weight:normal;
+		text-align:left;
+		border-bottom:1px solid #F0F0F0;
+		background-color:white;}
+	
+	#content table th {
+		background-color:#F0F0F0;
+		font-weight:bold;
+		padding:5px;}
+	
+	#content table td {
+		border-bottom:1px solid #F0F0F0;
+		padding:5px;}
+		
+	#footer {
+		border-top:1px solid #F0F0F0;
+		padding:15px;}
+		
+	#footer span.copyright {
+		color:#999;}
+	
+</style>
+
+<script type="text/javascript">
+	// General properties and helper functions
+	window.Planbox = {
+		// Url to Planbox. You can use https if you like.
+		base_url: 'http://www.planbox.com/',
+		
+		// This object will contain the logged user
+		logged_resource: {},
+		
+		// Call the Planbox API
+		api: function(fname, args, onsuccess, onerror) {
+			var url = Planbox.base_url+'api/'+fname+'?callback=?';
+			args = args || {};
+			return $.getJSON(url, args, function(data) {
+				if (data && data.code == 'ok') {
+					if (onsuccess) onsuccess(data.content);
+				} else if (data && data.code == 'error') {
+					if (onerror) onerror(data.content);
+				} else {
+					if (onerror) onerror('Cannot reach Planbox');
+				}
+			}, 'json');
+		},
+		
+		// Helper function to create a table from an array
+		// Returns the newly created TABLE element
+		// Also sets ZeroClipboard's data
+		table: function(header, data) {
+			var table = $('<table cellspacing="0" cellpadding="2" border="0">');
+			var tr = $('<tr>').appendTo(table);
+			for (var c=0; c<header.length; c++)
+				$('<th>'+header[c]+'</th>').appendTo(tr);
+			
+			for (var r=0; r<data.length; r++) {
+				tr = $('<tr>').appendTo(table);
+				for (var c=0; c<data[r].length; c++)
+					$('<td>'+data[r][c]+'</td>').appendTo(tr);
+			}
+			
+			return table;
+		},
+		
+		// Constructs a URL to reach the Work page in Planbox
+		// and show the appropriate object
+		url: function(product_id, project_id, story_id) {
+			var url = 'http';
+			if (Planbox.logged_resource.https) url += 's';
+			url += '://www.planbox.com/nik';
+			if (product_id) {
+				url += '#{product_id:'+product_id;
+				if (project_id)
+					url += ',project_id:'+project_id;
+				if (story_id)
+					url += ',story_id:'+story_id
+				url += '}';
+			}
+			return url;
+		}
+	};
+	
+	// Script to login/logout and load the logged resource object
+	$(document).ready(function() {
+		var message = $('#message');
+		var buttons = $('#buttons>button');
+		var content = $('#content');
+		
+		// Login & logout
+		var login = $('#header div.login_logout .login');
+		var logout = $('#header div.login_logout .logout');
+		var login_button = $('#header div.login_logout button.login');
+		var login_email = $('#header div.login_logout input[name=email]');
+		var login_password = $('#header div.login_logout input[name=password]');
+		var logged_welcome = $('#header div.login_logout label.welcome');
+		var logout_button = $('#header div.login_logout a.logout');
+		var clear = $('#buttons button.clear');
+		
+		// Helper function to login
+		var _login = function(e) {
+			login_button.attr('disabled', 'disabled');
+			message.removeClass('error').addClass('ok').text('Please wait...');
+			Planbox.api('login', {email:login_email.val(), password:login_password.val()}, 
+				function(result) {
+					message.addClass('ok').text(result);
+					Planbox.api('get_logged_resource', {},
+						function(obj) {
+							Planbox.logged_resource = obj;
+							logged_welcome.text("Welcome "+Planbox.logged_resource.name);
+							logout.show();
+							login.hide();
+							message.removeClass('ok error').empty();
+							login_button.removeAttr('disabled');
+						},
+						function(error) {
+							message.removeClass('ok').addClass('error').text(error);
+							login_button.removeAttr('disabled');
+						}
+					);
+				},
+				function(error) {
+					login_button.removeAttr('disabled');
+					message.removeClass('ok').addClass('error').text(error);
+				}
+			);
+			return false;
+		};
+		
+		// Helper function to logout
+		var _logout = function(e) {
+			message.removeClass('error').addClass('ok').text('Please wait...');
+			Planbox.api('logout', {},
+				function() {
+					logout.hide();
+					login.show();
+					message.removeClass('ok error').empty();
+					Planbox.logged_resource = {};
+					clear.click();
+				},
+				function(error) {
+					message.removeClass('ok').addClass('error').text(error);
+				}
+			);
+			return false;
+		};
+		
+		// Bind our elements to trigger correct functions
+		login_button.bind('click', _login);
+		login_password.bind('keydown', function(e) {
+			if (e.keyCode == 13) return _login(arguments);
+			return true;
+		});
+		logout_button.bind('click', _logout);
+		
+		
+		// Start by loading the logged user
+		logout.hide();
+		message.removeClass('error').addClass('ok').text('Please wait...');
+		Planbox.api('get_logged_resource', {},
+			function(obj) {
+				Planbox.logged_resource = obj;
+				logged_welcome.text("Welcome "+Planbox.logged_resource.name);
+				logout.show();
+				login.hide();
+				message.removeClass('ok error').empty();
+			},
+			function(error) {
+				message.removeClass('ok error').empty();
+			}
+		);
+		
+		// Clear table
+		clear.click(function(e) {
+			content.empty();
+			var table = Planbox.table(['NO DATA LOADED'], ['']);
+			table.appendTo(content);
+			table.find('th').css({
+				textAlign:'center',
+				fontStyle:'italic',
+				fontWeight:'normal'
+			});
+		});
+		
+		// Start everything by showing an empty table
+		clear.click();
+		
+	});
+</script>
+
+<script type="text/javascript">
+	// Your custom scripts go here
+	$(document).ready(function() {
+		var buttons = $('#buttons>button');
+		var message = $('#message');
+		var content = $('#content');
+		
+		
+		// My products
+		var my_products = $('#buttons button.my_products');
+		my_products.click(function(e) {
+			content.empty();
+			message.removeClass('error').addClass('ok').text('Please wait...');
+			buttons.attr('disabled', 'disabled');
+			
+			// Load products
+			Planbox.api('get_products', {},
+				function(obj) {
+					var products = obj;
+					var product_ids = [];
+					var product_id2name = {};
+					for (var i=0; i<products.length; i++) {
+						var product = products[i];
+						product_id2name[product.id] = product.name;
+						product_ids.push(product.id);
+					}
+					buttons.removeAttr('disabled');
+					message
+						.removeClass('error')
+						.addClass('ok')
+						.text(products.length+' products loaded');
+					
+					// Build arrays
+					var header = ['id', 'name', 'permission'];
+					var data = [];
+					for (var i=0; i<products.length; i++) {
+						var product = products[i];
+						var row = [];
+						row.push('<a href="'+Planbox.url(product.id)+'" target="_blank">'+product.id+'</a>');
+						row.push(product.name);
+						row.push(product.permission);
+						data.push(row);
+					}
+					
+					// Create table and show it
+					var table = Planbox.table(header, data);
+					table.appendTo(content);
+				},
+				function(error) {
+					buttons.removeAttr('disabled');
+					message.removeClass('ok').addClass('error').text(error);
+				}
+			);
+			return false;
+		});
+		
+		// My projects across all products
+		var my_projects = $('#buttons button.my_projects');
+		my_projects.click(function(e) {
+			content.empty();
+			message.removeClass('error').addClass('ok').text('Please wait...');
+			buttons.attr('disabled', 'disabled');
+			
+			// Load products
+			Planbox.api('get_products', {},
+				function(obj) {
+					var products = obj;
+					var product_ids = [];
+					var product_id2name = {};
+					for (var i=0; i<products.length; i++) {
+						var product = products[i];
+						product_id2name[product.id] = product.name;
+						product_ids.push(product.id);
+					}
+					message
+						.removeClass('error')
+						.addClass('ok')
+						.text(products.length+' products loaded. Now loading projects...');
+					
+					// Load stories for these products where the logged
+					// user is involved
+					Planbox.api('get_projects', {
+							product_id: product_ids
+						},
+						function(obj) {
+							var projects = obj;
+							buttons.removeAttr('disabled');
+							message
+								.removeClass('error')
+								.addClass('ok')
+								.text(projects.length+' projects loaded across '+products.length+' products');
+							
+							// Build arrays
+							var header = ['id', 'product', 'name', 'alias'];
+							var data = [];
+							for (var i=0; i<projects.length; i++) {
+								var project = projects[i];
+								var row = [];
+								row.push('<a href="'+Planbox.url(project.product_id, project.id)+'" target="_blank">'+project.id+'</a>');
+								row.push(product_id2name[project.product_id]);
+								row.push(project.name);
+								row.push(project.alias);
+								data.push(row);
+							}
+							
+							// Create table and show it
+							var table = Planbox.table(header, data);
+							table.appendTo(content);
+						},
+						function(error) {
+							buttons.removeAttr('disabled');
+							message.removeClass('ok').addClass('error').text(error);
+						}
+					);
+				},
+				function(error) {
+					buttons.removeAttr('disabled');
+					message.removeClass('ok').addClass('error').text(error);
+				}
+			);
+			return false;
+		});
+		
+		// My stories across all products
+		var my_stories = $('#buttons button.my_stories');
+		my_stories.click(function(e) {
+			content.empty();
+			message.removeClass('error').addClass('ok').text('Please wait...');
+			buttons.attr('disabled', 'disabled');
+			
+			// Load products
+			Planbox.api('get_products', {},
+				function(obj) {
+					var products = obj;
+					var product_ids = [];
+					var product_id2name = {};
+					for (var i=0; i<products.length; i++) {
+						var product = products[i];
+						product_id2name[product.id] = product.name;
+						product_ids.push(product.id);
+					}
+					message
+						.removeClass('error')
+						.addClass('ok')
+						.text(products.length+' products loaded. Now loading stories...');
+					
+					// Load stories for these products where the logged
+					// user is involved
+					Planbox.api('get_stories', {
+							product_id: product_ids,
+							timeframe: 'current',
+							resource_id: Planbox.logged_resource.id
+						},
+						function(obj) {
+							var stories = obj;
+							buttons.removeAttr('disabled');
+							message
+								.removeClass('error')
+								.addClass('ok')
+								.text(stories.length+' stories loaded across '+products.length+' products');
+							
+							// Build arrays
+							var header = ['id', 'product', 'name', 'status'];
+							var data = [];
+							for (var i=0; i<stories.length; i++) {
+								var story = stories[i];
+								var row = [];
+								row.push('<a href="'+Planbox.url(story.product_id, null, story.id)+'" target="_blank">'+story.id+'</a>');
+								row.push(product_id2name[story.product_id]);
+								row.push(story.name);
+								row.push(story.status);
+								data.push(row);
+							}
+							
+							// Create table and show it
+							var table = Planbox.table(header, data);
+							table.appendTo(content);
+						},
+						function(error) {
+							buttons.removeAttr('disabled');
+							message.removeClass('ok').addClass('error').text(error);
+						}
+					);
+				},
+				function(error) {
+					buttons.removeAttr('disabled');
+					message.removeClass('ok').addClass('error').text(error);
+				}
+			);
+			return false;
+		});
+		
+	});
+</script>
+
+<body>
+	<div id="header">
+		<a class="fl logo" href="http://www.planbox.com" target="_blank">
+			<img src="http://www.planbox.com/img/logo_small.png" alt="Planbox" />
+		</a>
+		<div class="fl sandbox">API Sanbox</div>
+		<a class="fl help" href="http://www.planbox.com/api" target="_blank">Help</a>
+		<div class="login_logout fr">
+			<label class="login">Login</label>
+			<input class="login" type="text" id="email" name="email" />
+			<input class="login" type="password" id="password" name="password" />
+			<button class="login">Submit</button>
+			<label class="logout welcome">Welcome </label>
+			<a href="#" class="logout">Logout</a>
+		</div>
+		<div class="clear"></div>
+	</div>
+	<div id="message"></div>
+	
+	<div id="buttons">
+		<button class="my_products" title="Load my products">My Products</button>
+		<button class="my_projects" title="Load my projects across all products">My Projects</button>
+		<button class="my_stories" title="Load my stories across all products">My Stories</button>
+		<label>&nbsp;|&nbsp;</label>
+		<button class="clear" title="Clear table">Clear</button>
+		<div class="clear"></div>
+	</div>
+	
+	<div id="content"></div>
+	
+	<div id="footer">
+		<a class="fl" href="http://www.planbox.com/api">http://www.planbox.com/api</a>
+		<span class="fr copyright">&copy; Planbox 2011</span>
+		<div class="clear"</div>
+	</div>
+<body>
+</html>
